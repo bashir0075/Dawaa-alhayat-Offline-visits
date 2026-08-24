@@ -25,3 +25,7 @@ apps/mobile/.flutter-plugins*
 # Prisma generated client
 apps/api/node_modules/
 apps/api/generated/
+
+# Next.js
+apps/web/.next/
+apps/web/next-env.d.ts
