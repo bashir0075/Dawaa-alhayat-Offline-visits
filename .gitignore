@@ -1,0 +1,23 @@
+node_modules/
+dist/
+build/
+.next/
+out/
+*.log
+.env
+.env.local
+.env.*.local
+.DS_Store
+Thumbs.db
+
+# بيانات حقيقية — لا تُرفع على GitHub إطلاقاً
+data/source/*.xlsx
+data/source/*.xls
+data/source/*.csv
+data/output/
+!data/source/README.md
+
+# Flutter
+apps/mobile/build/
+apps/mobile/.dart_tool/
+apps/mobile/.flutter-plugins*

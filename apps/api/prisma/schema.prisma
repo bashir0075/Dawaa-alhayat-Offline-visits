@@ -1,0 +1,684 @@
+// ════════════════════════════════════════════════════════════════
+//  نظام تسجيل الزيارات — Dawaa Al Hayat
+//  PostgreSQL 16 + Prisma
+//  الإضافات المطلوبة: pg_trgm (بحث متسامح) · unaccent (تطبيع عربي)
+// ════════════════════════════════════════════════════════════════
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pg_trgm, unaccent]
+}
+
+// ════════════════════════════════════════════════════════════════
+//  ١ · الهوية والصلاحيات
+// ════════════════════════════════════════════════════════════════
+
+model User {
+  id                 Int       @id @default(autoincrement())
+  username           String    @unique                    // 6905306500@dawaa-alhayat
+  legacyUserId       String?   @map("legacy_user_id")      // 6905306500 من النظام القديم
+  passwordHash       String    @map("password_hash")
+  fullNameAr         String?   @map("full_name_ar")
+  fullNameEn         String    @map("full_name_en")
+  employeeCode       String?   @unique @map("employee_code")
+  email              String?
+  phone              String?
+
+  departmentId       Int?      @map("department_id")
+  positionId         Int?      @map("position_id")
+  officeId           Int?      @map("office_id")
+  managerId          Int?      @map("manager_id")          // الهرم الإداري الحقيقي
+  roleId             Int       @map("role_id")
+
+  isActive           Boolean   @default(true) @map("is_active")
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  passwordChangedAt  DateTime? @map("password_changed_at")
+  lastLoginAt        DateTime? @map("last_login_at")
+  lockedUntil        DateTime? @map("locked_until")
+
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  createdById        Int?      @map("created_by_id")
+  deletedAt          DateTime? @map("deleted_at")          // حذف ناعم فقط
+
+  department       Department? @relation(fields: [departmentId], references: [id])
+  position         Position?   @relation(fields: [positionId], references: [id])
+  office           Office?     @relation(fields: [officeId], references: [id])
+  role             Role        @relation(fields: [roleId], references: [id])
+  manager          User?       @relation("Hierarchy", fields: [managerId], references: [id])
+  subordinates     User[]      @relation("Hierarchy")
+
+  territories      UserTerritory[]
+  extraPermissions UserPermission[]
+  refreshTokens    RefreshToken[]
+  visits           Visit[]
+  assignments      CustomerAssignment[]
+  targets          Target[]
+  auditEntries     AuditLog[]              @relation("AuditActor")
+  changeRequests   CustomerChangeRequest[] @relation("RequestedBy")
+  corrections      CorrectionRequest[]     @relation("CorrectionRequestedBy")
+  importBatches    ImportBatch[]
+  exportJobs       ExportJob[]
+  notifications    Notification[]
+
+  @@index([managerId])
+  @@index([departmentId])
+  @@index([isActive, deletedAt])
+  @@map("users")
+}
+
+model Role {
+  id       Int     @id @default(autoincrement())
+  key      String  @unique   // super_admin | admin | manager | team_leader | representative | viewer
+  nameAr   String  @map("name_ar")
+  nameEn   String  @map("name_en")
+  isSystem Boolean @default(false) @map("is_system")   // لا يُحذف
+
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id     Int    @id @default(autoincrement())
+  key    String @unique   // visits.create · reports.export_all · customers.approve
+  group  String           // visits | customers | reports | users | settings
+  nameAr String @map("name_ar")
+  nameEn String @map("name_en")
+
+  roles RolePermission[]
+  users UserPermission[]
+
+  @@index([group])
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       Int @map("role_id")
+  permissionId Int @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// استثناء فردي: يمنح أو يسحب إذناً لشخص بعينه دون تغيير دوره
+model UserPermission {
+  userId       Int     @map("user_id")
+  permissionId Int     @map("permission_id")
+  granted      Boolean @default(true)   // false = سحب صريح
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permissionId])
+  @@map("user_permissions")
+}
+
+model Department {
+  id       Int     @id @default(autoincrement())
+  nameAr   String  @map("name_ar")
+  nameEn   String  @unique @map("name_en")   // Sales · Promotion · Marketing · HR
+  isActive Boolean @default(true) @map("is_active")
+
+  users     User[]
+  positions Position[]
+
+  @@map("departments")
+}
+
+model Position {
+  id           Int     @id @default(autoincrement())
+  nameAr       String  @map("name_ar")
+  nameEn       String  @map("name_en")
+  departmentId Int?    @map("department_id")
+  level        Int     @default(0)   // 0=مندوب 1=مشرف 2=قائد فريق 3=مدير منطقة 4=مدير قسم 5=إدارة عليا
+  isActive     Boolean @default(true) @map("is_active")
+
+  department Department? @relation(fields: [departmentId], references: [id])
+  users      User[]
+
+  @@unique([nameEn, departmentId])
+  @@map("positions")
+}
+
+model Office {
+  id       Int     @id @default(autoincrement())
+  nameAr   String  @map("name_ar")
+  nameEn   String  @unique @map("name_en")
+  isActive Boolean @default(true) @map("is_active")
+
+  users User[]
+
+  @@map("offices")
+}
+
+// مناطق المندوب — many-to-many لأن City كان "Erbil, Mosel, Duhok" في صف واحد
+model UserTerritory {
+  id         Int  @id @default(autoincrement())
+  userId     Int  @map("user_id")
+  provinceId Int  @map("province_id")
+  areaId     Int? @map("area_id")   // null = كل مناطق المحافظة
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  province Province @relation(fields: [provinceId], references: [id])
+  area     Area?    @relation(fields: [areaId], references: [id])
+
+  @@unique([userId, provinceId, areaId])
+  @@map("user_territories")
+}
+
+model RefreshToken {
+  id         Int       @id @default(autoincrement())
+  userId     Int       @map("user_id")
+  tokenHash  String    @unique @map("token_hash")
+  deviceInfo String?   @map("device_info")
+  ipAddress  String?   @map("ip_address")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model LoginAttempt {
+  id        Int      @id @default(autoincrement())
+  username  String
+  success   Boolean
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([username, createdAt])
+  @@map("login_attempts")
+}
+
+// ════════════════════════════════════════════════════════════════
+//  ٢ · الجغرافيا والقوائم المرجعية  (الأدمن يتحكم بها كاملة)
+// ════════════════════════════════════════════════════════════════
+
+model Province {
+  id        Int     @id @default(autoincrement())
+  nameAr    String  @unique @map("name_ar")
+  nameEn    String  @map("name_en")
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  areas       Area[]
+  customers   Customer[]
+  territories UserTerritory[]
+
+  @@map("provinces")
+}
+
+model Area {
+  id         Int     @id @default(autoincrement())
+  provinceId Int     @map("province_id")
+  nameAr     String  @map("name_ar")
+  nameEn     String? @map("name_en")
+  isActive   Boolean @default(true) @map("is_active")
+
+  province    Province        @relation(fields: [provinceId], references: [id])
+  customers   Customer[]
+  territories UserTerritory[]
+
+  @@unique([provinceId, nameAr])
+  @@map("areas")
+}
+
+model Speciality {
+  id        Int     @id @default(autoincrement())
+  nameEn    String  @unique @map("name_en")
+  nameAr    String? @map("name_ar")
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  customers Customer[]
+
+  @@map("specialities")
+}
+
+model ProductCategory {
+  id       Int     @id @default(autoincrement())
+  key      String  @unique   // gummies | oncology | hospital
+  nameAr   String  @map("name_ar")
+  nameEn   String  @map("name_en")
+  isActive Boolean @default(true) @map("is_active")
+
+  products Product[]
+
+  @@map("product_categories")
+}
+
+model Product {
+  id         Int       @id @default(autoincrement())
+  code       String    @unique                 // FG-01 · ONC-01 · HOS-01
+  nameFull   String    @map("name_full")       // الاسم الرسمي الكامل للتقارير
+  shortName  String    @map("short_name")      // B12 — ما يراه المندوب
+  nameAr     String?   @map("name_ar")         // بي ١٢
+  categoryId Int?      @map("category_id")
+  sortOrder  Int       @default(0) @map("sort_order")   // الأكثر استخداماً أولاً
+  isActive   Boolean   @default(true) @map("is_active") // تعطيل لا حذف
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  category      ProductCategory? @relation(fields: [categoryId], references: [id])
+  aliases       ProductAlias[]
+  visitProducts VisitProduct[]
+
+  @@index([isActive, sortOrder])
+  @@map("products")
+}
+
+// يحل مشكلة الـ ٨٥١ صيغة: b12 · B12 · بي ١٢ ← منتج واحد
+model ProductAlias {
+  id         Int    @id @default(autoincrement())
+  productId  Int    @map("product_id")
+  alias      String
+  normalized String
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([normalized])
+  @@index([productId])
+  @@map("product_aliases")
+}
+
+// جدول التحويل — سؤال واحد للمندوب، والباقي يُشتق
+model CustomerClass {
+  id            Int     @id @default(autoincrement())
+  code          String  @unique   // "A 1" … "C 2"
+  classLetter   String  @map("class_letter")     // A | B | C  ← مشتق
+  monthlyTarget Int     @map("monthly_target")   // بانتظار أرقام العميل
+  sortOrder     Int     @default(0) @map("sort_order")
+  isActive      Boolean @default(true) @map("is_active")
+
+  customers Customer[]
+
+  @@map("customer_classes")
+}
+
+// قاموس ينمو تلقائياً — للاقتراح لا للإلزام
+model PromoMaterialSuggestion {
+  id         Int      @id @default(autoincrement())
+  text       String   @unique
+  normalized String
+  usageCount Int      @default(1) @map("usage_count")
+  lastUsedAt DateTime @default(now()) @map("last_used_at")
+
+  @@index([normalized])
+  @@map("promo_material_suggestions")
+}
+
+// إعدادات يغيّرها الأدمن بلا برمجة
+model AppSetting {
+  key         String   @id
+  value       Json
+  description String?
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedById Int?     @map("updated_by_id")
+
+  @@map("app_settings")
+}
+
+// ════════════════════════════════════════════════════════════════
+//  ٣ · العملاء  (جدول واحد للأطباء والصيدليات — لا تكرار)
+// ════════════════════════════════════════════════════════════════
+
+enum CustomerType {
+  doctor
+  pharmacy
+}
+
+enum CustomerStatus {
+  pending // بانتظار موافقة المدير
+  approved
+  rejected
+  inactive
+}
+
+enum CustomerSource {
+  seed           // بذور أولية
+  added_in_app   // أضافه المندوب من التطبيق
+  from_out_visit // وُلد تلقائياً من زيارة خارج القائمة
+  imported       // استيراد Excel
+}
+
+enum WorkTime {
+  a // صباحي
+  p // مسائي
+}
+
+model Customer {
+  id             Int          @id @default(autoincrement())
+  code           String       @unique   // DR-00001 · PH-00001
+  customerType   CustomerType @map("customer_type")
+
+  nameAr         String  @map("name_ar")
+  nameEn         String? @map("name_en")
+  normalizedName String  @map("normalized_name")   // للبحث المتسامح مع الأخطاء
+
+  // للأطباء فقط
+  specialityId Int?      @map("speciality_id")
+  hospital     String?
+  workTime     WorkTime? @map("work_time")
+
+  provinceId Int?    @map("province_id")
+  areaId     Int?    @map("area_id")
+  street     String?
+  phone      String?
+
+  classId Int? @map("class_id")   // → CustomerClass (A 1 … C 2)
+
+  status CustomerStatus @default(pending)
+  source CustomerSource @default(added_in_app)
+
+  createdById     Int?      @map("created_by_id")
+  approvedById    Int?      @map("approved_by_id")
+  approvedAt      DateTime? @map("approved_at")
+  rejectionReason String?   @map("rejection_reason")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  speciality    Speciality?    @relation(fields: [specialityId], references: [id])
+  province      Province?      @relation(fields: [provinceId], references: [id])
+  area          Area?          @relation(fields: [areaId], references: [id])
+  customerClass CustomerClass? @relation(fields: [classId], references: [id])
+
+  assignments    CustomerAssignment[]
+  visits         Visit[]
+  changeRequests CustomerChangeRequest[]
+  targets        Target[]
+
+  @@index([customerType, status])
+  @@index([normalizedName])
+  @@index([provinceId, areaId])
+  @@map("customers")
+}
+
+// "القائمة" — من يملك أي عميل ومتى. بتاريخ حتى لا تُنسب الزيارات القديمة لمندوب جديد
+model CustomerAssignment {
+  id          Int       @id @default(autoincrement())
+  customerId  Int       @map("customer_id")
+  userId      Int       @map("user_id")
+  fromDate    DateTime  @default(now()) @map("from_date") @db.Date
+  toDate      DateTime? @map("to_date") @db.Date
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  createdById Int?      @map("created_by_id")
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, isActive])
+  @@index([customerId, isActive])
+  @@map("customer_assignments")
+}
+
+enum RequestType {
+  add
+  remove
+  edit
+}
+
+enum RequestStatus {
+  pending
+  approved
+  rejected
+}
+
+model CustomerChangeRequest {
+  id            Int           @id @default(autoincrement())
+  customerId    Int?          @map("customer_id")   // null عند طلب إضافة جديد
+  requestType   RequestType   @map("request_type")
+  payload       Json                                // بيانات العميل المقترحة
+  reason        String?
+  status        RequestStatus @default(pending)
+  requestedById Int           @map("requested_by_id")
+  reviewedById  Int?          @map("reviewed_by_id")
+  reviewedAt    DateTime?     @map("reviewed_at")
+  reviewNote    String?       @map("review_note")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  customer    Customer? @relation(fields: [customerId], references: [id])
+  requestedBy User      @relation("RequestedBy", fields: [requestedById], references: [id])
+
+  @@index([status, createdAt])
+  @@map("customer_change_requests")
+}
+
+// ════════════════════════════════════════════════════════════════
+//  ٤ · الزيارات  — مقفلة بعد الحفظ · لقطة مجمّدة لكل صف
+// ════════════════════════════════════════════════════════════════
+
+enum VisitType {
+  in_list
+  out_list
+}
+
+enum VisitSource {
+  web
+  mobile
+  imported
+}
+
+model Visit {
+  id      Int    @id @default(autoincrement())
+  visitNo String @unique @map("visit_no")   // V-2026-000001
+
+  userId       Int          @map("user_id")
+  customerId   Int?         @map("customer_id")
+  visitType    VisitType    @map("visit_type")
+  customerType CustomerType @map("customer_type")
+
+  visitDate  DateTime @map("visit_date") @db.Date          // يدخله المندوب
+  recordedAt DateTime @default(now()) @map("recorded_at")  // ختم السيرفر — لا يُزوَّر
+
+  visitReason    String? @map("visit_reason")   // لزيارات خارج القائمة
+  sampleQuantity Int?    @map("sample_quantity")
+  promoGiven     Boolean @default(false) @map("promo_given")
+  promoText      String? @map("promo_text")
+  notes          String?
+
+  source        VisitSource @default(web)
+  importBatchId Int?        @map("import_batch_id")
+  isLocked      Boolean     @default(true) @map("is_locked")
+
+  deletedAt    DateTime? @map("deleted_at")
+  deletedById  Int?      @map("deleted_by_id")
+  deleteReason String?   @map("delete_reason")
+
+  // ── اللقطة المجمّدة — تحفظ التقرير التاريخي من التغيّر بأثر رجعي ──
+  snapCustomerCode  String? @map("snap_customer_code")
+  snapCustomerName  String? @map("snap_customer_name")
+  snapSpeciality    String? @map("snap_speciality")
+  snapHospital      String? @map("snap_hospital")
+  snapWorkTime      String? @map("snap_work_time")
+  snapProvince      String? @map("snap_province")
+  snapArea          String? @map("snap_area")
+  snapStreet        String? @map("snap_street")
+  snapClassCode     String? @map("snap_class_code")     // "A 2"
+  snapClassLetter   String? @map("snap_class_letter")   // "A"
+  snapMonthlyTarget Int?    @map("snap_monthly_target")
+  snapUserName      String? @map("snap_user_name")
+  snapDepartment    String? @map("snap_department")
+  snapPosition      String? @map("snap_position")
+  snapManagerName   String? @map("snap_manager_name")
+
+  user        User         @relation(fields: [userId], references: [id])
+  customer    Customer?    @relation(fields: [customerId], references: [id])
+  importBatch ImportBatch? @relation(fields: [importBatchId], references: [id])
+
+  products    VisitProduct[]
+  corrections CorrectionRequest[]
+
+  @@index([userId, visitDate])
+  @@index([customerId, visitDate])
+  @@index([visitDate])
+  @@index([deletedAt])
+  @@map("visits")
+}
+
+enum ProductRole {
+  main     // المنتج الأساسي
+  reminder // منتج تذكيري
+  sample   // نموذج مجاني
+}
+
+// جدول أبناء — يسمح بعدة منتجات ويجعل تقرير المنتجات استعلاماً واحداً
+model VisitProduct {
+  id        Int         @id @default(autoincrement())
+  visitId   Int         @map("visit_id")
+  productId Int         @map("product_id")
+  role      ProductRole
+  quantity  Int?
+
+  visit   Visit   @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([visitId, productId, role])
+  @@index([productId])
+  @@map("visit_products")
+}
+
+// ════════════════════════════════════════════════════════════════
+//  ٥ · التارغيت والرقابة
+// ════════════════════════════════════════════════════════════════
+
+model Target {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @map("user_id")
+  customerId    Int?     @map("customer_id")   // null = تارغيت إجمالي للمندوب
+  year          Int
+  month         Int
+  plannedVisits Int      @map("planned_visits")
+  source        String   @default("class_rule")   // class_rule | manual
+  createdAt     DateTime @default(now()) @map("created_at")
+  createdById   Int?     @map("created_by_id")
+
+  user     User      @relation(fields: [userId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+
+  @@unique([userId, customerId, year, month])
+  @@index([year, month])
+  @@map("targets")
+}
+
+model CorrectionRequest {
+  id            Int           @id @default(autoincrement())
+  visitId       Int           @map("visit_id")
+  requestedById Int           @map("requested_by_id")
+  fieldName     String        @map("field_name")
+  oldValue      String?       @map("old_value")
+  newValue      String?       @map("new_value")
+  reason        String
+  status        RequestStatus @default(pending)
+  reviewedById  Int?          @map("reviewed_by_id")
+  reviewedAt    DateTime?     @map("reviewed_at")
+  reviewNote    String?       @map("review_note")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  visit       Visit @relation(fields: [visitId], references: [id])
+  requestedBy User  @relation("CorrectionRequestedBy", fields: [requestedById], references: [id])
+
+  @@index([status])
+  @@map("correction_requests")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorId    Int?     @map("actor_id")
+  action     String            // create | update | delete | login | export | approve
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  before     Json?
+  after      Json?
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  actor User? @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@index([createdAt])
+  @@map("audit_log")
+}
+
+enum ImportStatus {
+  draft
+  validated
+  committed
+  rolled_back
+}
+
+// كل استيراد دفعة واحدة قابلة للتراجع الكامل بضغطة
+model ImportBatch {
+  id           Int          @id @default(autoincrement())
+  entityType   String       @map("entity_type")   // visits | customers | users
+  fileName     String       @map("file_name")
+  rowCount     Int          @default(0) @map("row_count")
+  successCount Int          @default(0) @map("success_count")
+  errorCount   Int          @default(0) @map("error_count")
+  status       ImportStatus @default(draft)
+  columnMap    Json?        @map("column_map")    // يتذكّر المطابقة للمرة القادمة
+  errors       Json?
+  importedById Int          @map("imported_by_id")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  committedAt  DateTime?    @map("committed_at")
+  rolledBackAt DateTime?    @map("rolled_back_at")
+
+  importedBy User    @relation(fields: [importedById], references: [id])
+  visits     Visit[]
+
+  @@map("import_batches")
+}
+
+model ExportJob {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  reportKey String    @map("report_key")
+  params    Json
+  status    String    @default("pending")
+  filePath  String?   @map("file_path")
+  rowCount  Int?      @map("row_count")
+  createdAt DateTime  @default(now()) @map("created_at")
+  expiresAt DateTime? @map("expires_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@map("export_jobs")
+}
+
+model Notification {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  type      String
+  titleAr   String    @map("title_ar")
+  titleEn   String?   @map("title_en")
+  body      String?
+  link      String?
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}

@@ -1,0 +1,14 @@
+{
+  "name": "dawaa-visits",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["apps/api", "apps/web", "packages/*"],
+  "scripts": {
+    "users:build": "node scripts/import/build-users.mjs"
+  },
+  "devDependencies": {
+    "exceljs": "^4.4.0",
+    "xlsx": "^0.18.5"
+  }
+}

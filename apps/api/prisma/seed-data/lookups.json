@@ -1,0 +1,110 @@
+{
+  "productCategories": [
+    { "key": "gummies",  "nameAr": "المكمّلات (Fine's)", "nameEn": "Fine's Gummies" },
+    { "key": "oncology", "nameAr": "الأورام (Aqvida)",   "nameEn": "Oncology (Aqvida)" },
+    { "key": "hospital", "nameAr": "المستشفيات / حقن",   "nameEn": "Hospital / Injectables" }
+  ],
+
+  "provinces": [
+    { "nameAr": "بغداد",        "nameEn": "Baghdad",     "sortOrder": 1 },
+    { "nameAr": "البصرة",       "nameEn": "Basra",        "sortOrder": 2 },
+    { "nameAr": "نينوى",        "nameEn": "Nineveh",      "sortOrder": 3 },
+    { "nameAr": "أربيل",        "nameEn": "Erbil",        "sortOrder": 4 },
+    { "nameAr": "السليمانية",   "nameEn": "Sulaymaniyah", "sortOrder": 5 },
+    { "nameAr": "دهوك",         "nameEn": "Duhok",        "sortOrder": 6 },
+    { "nameAr": "كركوك",        "nameEn": "Kirkuk",       "sortOrder": 7 },
+    { "nameAr": "النجف",        "nameEn": "Najaf",        "sortOrder": 8 },
+    { "nameAr": "كربلاء",       "nameEn": "Karbala",      "sortOrder": 9 },
+    { "nameAr": "بابل",         "nameEn": "Babil",        "sortOrder": 10 },
+    { "nameAr": "ذي قار",       "nameEn": "Dhi Qar",      "sortOrder": 11 },
+    { "nameAr": "الأنبار",      "nameEn": "Anbar",        "sortOrder": 12 },
+    { "nameAr": "ديالى",        "nameEn": "Diyala",       "sortOrder": 13 },
+    { "nameAr": "صلاح الدين",   "nameEn": "Salah Al-Din", "sortOrder": 14 },
+    { "nameAr": "واسط",         "nameEn": "Wasit",        "sortOrder": 15 },
+    { "nameAr": "ميسان",        "nameEn": "Maysan",       "sortOrder": 16 },
+    { "nameAr": "المثنى",       "nameEn": "Muthanna",     "sortOrder": 17 },
+    { "nameAr": "القادسية",     "nameEn": "Qadisiyyah",   "sortOrder": 18 }
+  ],
+
+  "provinceAliases": {
+    "بغداد": "بغداد", "baghdad": "بغداد",
+    "البصرة": "البصرة", "بصرة": "البصرة", "basra": "البصرة", "bassra": "البصرة",
+    "الموصل": "نينوى", "موصل": "نينوى", "mosul": "نينوى", "mosel": "نينوى", "نينوى": "نينوى",
+    "اربيل": "أربيل", "أربيل": "أربيل", "erbil": "أربيل", "هولير": "أربيل",
+    "السليمانية": "السليمانية", "سليمانية": "السليمانية", "sulimanya": "السليمانية", "sulaimanya": "السليمانية",
+    "دهوك": "دهوك", "duhok": "دهوك", "دهok": "دهوك",
+    "كركوك": "كركوك", "kirkuk": "كركوك",
+    "النجف": "النجف", "نجف": "النجف", "najaf": "النجف",
+    "كربلاء": "كربلاء", "karbala": "كربلاء",
+    "بابل": "بابل", "babil": "بابل", "الحلة": "بابل",
+    "ناصرية": "ذي قار", "الناصرية": "ذي قار", "nassrya": "ذي قار", "ذي قار": "ذي قار",
+    "الانبار": "الأنبار", "الأنبار": "الأنبار", "anbar": "الأنبار", "الرمادي": "الأنبار",
+    "ديالى": "ديالى", "diyala": "ديالى", "بعقوبة": "ديالى",
+    "صلاح الدين": "صلاح الدين", "salahalden": "صلاح الدين", "تكريت": "صلاح الدين",
+    "كوت": "واسط", "الكوت": "واسط", "kut": "واسط", "واسط": "واسط",
+    "عمارة": "ميسان", "العمارة": "ميسان", "amara": "ميسان", "ميسان": "ميسان",
+    "سماوة": "المثنى", "السماوة": "المثنى", "sammawa": "المثنى", "المثنى": "المثنى",
+    "ديوانية": "القادسية", "الديوانية": "القادسية", "diwanyia": "القادسية", "القادسية": "القادسية"
+  },
+
+  "specialities": [
+    { "nameEn": "Pediatrics",                  "nameAr": "طب الأطفال",           "sortOrder": 1 },
+    { "nameEn": "Obstetrics and Gynecologist", "nameAr": "نسائية وتوليد",         "sortOrder": 2 },
+    { "nameEn": "Internal Medicine",           "nameAr": "الطب الباطني",          "sortOrder": 3 },
+    { "nameEn": "Ophthalmologist",             "nameAr": "طب العيون",            "sortOrder": 4 },
+    { "nameEn": "Orthopedics",                 "nameAr": "جراحة العظام",          "sortOrder": 5 },
+    { "nameEn": "Nutritionist",                "nameAr": "التغذية",              "sortOrder": 6 },
+    { "nameEn": "General Practitioner",        "nameAr": "طبيب عام",             "sortOrder": 7 },
+    { "nameEn": "Family medicine",             "nameAr": "طب الأسرة",            "sortOrder": 8 },
+    { "nameEn": "Endocrinologist",             "nameAr": "الغدد الصماء",          "sortOrder": 9 },
+    { "nameEn": "Dermatologist",               "nameAr": "الجلدية",              "sortOrder": 10 },
+    { "nameEn": "Neurosurgery",                "nameAr": "جراحة الأعصاب",         "sortOrder": 11 },
+    { "nameEn": "Nephrologist",                "nameAr": "أمراض الكلى",           "sortOrder": 12 },
+    { "nameEn": "Gastroenterologist",          "nameAr": "الجهاز الهضمي",         "sortOrder": 13 },
+    { "nameEn": "Pediatric surgery",           "nameAr": "جراحة الأطفال",         "sortOrder": 14 },
+    { "nameEn": "Psychiatric",                 "nameAr": "الطب النفسي",           "sortOrder": 15 },
+    { "nameEn": "Rheumatology",                "nameAr": "الروماتيزم",            "sortOrder": 16 },
+    { "nameEn": "Urologist",                   "nameAr": "المسالك البولية",       "sortOrder": 17 },
+    { "nameEn": "Vascular surgery",            "nameAr": "جراحة الأوعية",         "sortOrder": 18 },
+    { "nameEn": "General Surgery",             "nameAr": "الجراحة العامة",        "sortOrder": 19 },
+    { "nameEn": "Ear, nose and throat (ENT)",  "nameAr": "أنف وأذن وحنجرة",       "sortOrder": 20 },
+    { "nameEn": "Cardiologist",                "nameAr": "أمراض القلب",           "sortOrder": 21 },
+    { "nameEn": "Cardiac surgery",             "nameAr": "جراحة القلب",           "sortOrder": 22 },
+    { "nameEn": "Oncologist",                  "nameAr": "الأورام",              "sortOrder": 23 }
+  ],
+
+  "_customerClassesNote": "⏳ monthlyTarget بانتظار أرقام العميل — القيم أدناه مؤقتة (0) ولن تُستخدم في أي تقرير قبل تعبئتها",
+  "customerClasses": [
+    { "code": "A 1", "classLetter": "A", "monthlyTarget": 0, "sortOrder": 1 },
+    { "code": "A 2", "classLetter": "A", "monthlyTarget": 0, "sortOrder": 2 },
+    { "code": "A 3", "classLetter": "A", "monthlyTarget": 0, "sortOrder": 3 },
+    { "code": "A 4", "classLetter": "A", "monthlyTarget": 0, "sortOrder": 4 },
+    { "code": "B 1", "classLetter": "B", "monthlyTarget": 0, "sortOrder": 5 },
+    { "code": "B 2", "classLetter": "B", "monthlyTarget": 0, "sortOrder": 6 },
+    { "code": "B 3", "classLetter": "B", "monthlyTarget": 0, "sortOrder": 7 },
+    { "code": "C 1", "classLetter": "C", "monthlyTarget": 0, "sortOrder": 8 },
+    { "code": "C 2", "classLetter": "C", "monthlyTarget": 0, "sortOrder": 9 }
+  ],
+
+  "roles": [
+    { "key": "super_admin",    "nameAr": "مدير النظام",       "nameEn": "Super Admin",     "isSystem": true },
+    { "key": "admin",          "nameAr": "أدمن",             "nameEn": "Admin",           "isSystem": true },
+    { "key": "manager",        "nameAr": "مدير",             "nameEn": "Manager",         "isSystem": true },
+    { "key": "team_leader",    "nameAr": "قائد فريق",         "nameEn": "Team Leader",     "isSystem": true },
+    { "key": "representative", "nameAr": "مندوب",            "nameEn": "Representative",  "isSystem": true },
+    { "key": "viewer",         "nameAr": "مشاهد",            "nameEn": "Viewer",          "isSystem": true }
+  ],
+
+  "offices": [
+    { "nameAr": "المكتب العلمي — دواء الحياة", "nameEn": "Dawaa Al Hayat Scientific Bureau" },
+    { "nameAr": "شركة دواء الحياة",            "nameEn": "Dawaa Al Hayat Company" },
+    { "nameAr": "الكل",                        "nameEn": "All" }
+  ],
+
+  "departments": [
+    { "nameAr": "المبيعات", "nameEn": "Sales" },
+    { "nameAr": "الدعاية",  "nameEn": "Promotion" },
+    { "nameAr": "التسويق",  "nameEn": "Marketing" },
+    { "nameAr": "الموارد البشرية", "nameEn": "HR" }
+  ]
+}
