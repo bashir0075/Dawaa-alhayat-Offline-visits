@@ -259,15 +259,26 @@ async function seedUsers() {
     if (!u.position) continue;
     const key = `${u.position}|${u.department ?? ''}`;
     if (positions.has(key)) continue;
-    const pos = await prisma.position.upsert({
-      where: { nameEn_departmentId: { nameEn: u.position, departmentId: depId.get(u.department) ?? null } },
-      update: { level: u.positionLevel },
-      create: {
-        nameEn: u.position, nameAr: u.position,
-        departmentId: depId.get(u.department) ?? null,
-        level: u.positionLevel,
-      },
+    const departmentId = depId.get(u.department) ?? null;
+
+    // upsert لا يقبل null في مفتاح مركّب (departmentId اختياري لمنصب
+    // مثل CEO)، لذا نبحث أولاً ثم ننشئ أو نحدّث.
+    const existing = await prisma.position.findFirst({
+      where: { nameEn: u.position, departmentId },
     });
+
+    const pos = existing
+      ? await prisma.position.update({
+          where: { id: existing.id },
+          data: { level: u.positionLevel },
+        })
+      : await prisma.position.create({
+          data: {
+            nameEn: u.position, nameAr: u.position,
+            departmentId, level: u.positionLevel,
+          },
+        });
+
     positions.set(key, pos.id);
   }
   console.log(`   ✓ ${positions.size} منصباً`);
@@ -326,12 +337,15 @@ async function seedUsers() {
       const canonical = provAlias.get(norm);
       const pid = provByNorm.get(normalize(canonical ?? city));
       if (!pid) { unknownCities.add(city); continue; }
-      await prisma.userTerritory.upsert({
-        where: { userId_provinceId_areaId: { userId: uid, provinceId: pid, areaId: null } },
-        update: {},
-        create: { userId: uid, provinceId: pid },
+      // areaId فارغ يعني "كل مناطق المحافظة"، و upsert لا يقبل null
+      // في مفتاح مركّب — فنبحث أولاً.
+      const exists = await prisma.userTerritory.findFirst({
+        where: { userId: uid, provinceId: pid, areaId: null },
       });
-      terr++;
+      if (!exists) {
+        await prisma.userTerritory.create({ data: { userId: uid, provinceId: pid } });
+        terr++;
+      }
     }
   }
   console.log(`   ✓ ${terr} إسناد منطقة`);

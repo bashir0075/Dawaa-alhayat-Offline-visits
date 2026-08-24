@@ -249,10 +249,12 @@ export class ReportsService {
     const from = this.parseDate(range.from, 'تاريخ البداية');
     const to = this.parseDate(range.to, 'تاريخ النهاية');
 
-    // عدد الأشهر في الفترة — التارغيت شهري فيُضرب بها
+    // عدد الأشهر في الفترة — التارغيت شهري فيُضرب بها.
+    // ::int ضروري: DATE_PART يعيد double precision، و PostgreSQL
+    // لا يملك ROUND(double, int) — فقط ROUND(numeric, int).
     const months = Prisma.sql`
       GREATEST(1, (DATE_PART('year', ${to}::date) - DATE_PART('year', ${from}::date)) * 12
-                + (DATE_PART('month', ${to}::date) - DATE_PART('month', ${from}::date)) + 1)
+                + (DATE_PART('month', ${to}::date) - DATE_PART('month', ${from}::date)) + 1)::int
     `;
 
     return this.prisma.$queryRaw<any[]>`
