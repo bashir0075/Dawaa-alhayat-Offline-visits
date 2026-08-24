@@ -8,6 +8,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { VisitsModule } from './modules/visits/visits.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 
@@ -21,6 +22,7 @@ import { PermissionsGuard } from './common/guards/permissions.guard';
     CatalogModule,
     CustomersModule,
     VisitsModule,
+    ReportsModule,
   ],
   providers: [
     // كل المسارات محمية افتراضياً — يُستثنى ما يحمل @Public()
