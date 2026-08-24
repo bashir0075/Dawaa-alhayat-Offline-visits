@@ -1,0 +1,40 @@
+# ════════════════════════════════════════════════════════════════
+#  التطوير المحلي — PostgreSQL فقط
+#  تشغيل:  docker compose -f infra/docker-compose.dev.yml up -d
+# ════════════════════════════════════════════════════════════════
+
+name: dawaa-visits-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: visits-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: visits_app
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: visits
+      TZ: Asia/Baghdad
+      PGTZ: Asia/Baghdad
+    ports:
+      - "5432:5432"
+    volumes:
+      - visits_pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U visits_app -d visits"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # واجهة ويب بسيطة لتصفح قاعدة البيانات أثناء التطوير
+  adminer:
+    image: adminer:latest
+    container_name: visits-adminer-dev
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
+volumes:
+  visits_pgdata_dev:

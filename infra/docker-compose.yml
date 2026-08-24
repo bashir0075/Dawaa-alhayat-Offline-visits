@@ -1,0 +1,114 @@
+# ════════════════════════════════════════════════════════════════
+#  حزمة تطبيق الزيارات — معزولة تماماً عن n8n
+#  ⚠️ شبكة وحجم مستقلان. لا تلمس أي شيء يخص n8n.
+# ════════════════════════════════════════════════════════════════
+
+name: dawaa-visits
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: visits-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TZ: Asia/Baghdad
+      PGTZ: Asia/Baghdad
+      # ترتيب عربي صحيح للفرز
+      LANG: C.UTF-8
+    volumes:
+      - visits_pgdata:/var/lib/postgresql/data
+      - ./backups:/backups
+    # 🔒 لا منفذ منشور للإنترنت — الوصول من شبكة visits_net فقط.
+    #    للوصول من جهازك: نفق SSH
+    #    ssh -L 5432:localhost:5432 user@31.97.33.107
+    ports:
+      - "127.0.0.1:5432:5432"
+    networks:
+      - visits_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # حدود تمنع خنق n8n عند تصدير تقرير ثقيل
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "2.0"
+
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    container_name: visits-api
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      NODE_ENV: production
+      TZ: Asia/Baghdad
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3001:3001"
+    networks:
+      - visits_net
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1.0"
+
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+    container_name: visits-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      TZ: Asia/Baghdad
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      - visits_net
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1.0"
+
+  # نسخ احتياطي ليلي — pg_dump مضغوط، يُحتفظ به 30 يوماً
+  backup:
+    image: postgres:16-alpine
+    container_name: visits-backup
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      TZ: Asia/Baghdad
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup.sh:/backup.sh:ro
+    entrypoint: ["/bin/sh", "-c", "chmod +x /backup.sh; while true; do sleep 86400; /backup.sh; done"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - visits_net
+
+volumes:
+  visits_pgdata:
+    name: visits_pgdata
+
+networks:
+  visits_net:
+    name: visits_net
+    driver: bridge

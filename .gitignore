@@ -21,3 +21,7 @@ data/output/
 apps/mobile/build/
 apps/mobile/.dart_tool/
 apps/mobile/.flutter-plugins*
+
+# Prisma generated client
+apps/api/node_modules/
+apps/api/generated/
