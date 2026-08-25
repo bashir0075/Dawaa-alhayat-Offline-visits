@@ -130,6 +130,11 @@ model Department {
   nameEn   String  @unique @map("name_en")   // Sales · Promotion · Marketing · HR
   isActive Boolean @default(true) @map("is_active")
 
+  // نوع العميل المسموح لهذا القسم: Sales صيدليات · Promotion أطباء
+  // null = الاثنان معاً (الإدارة والموارد البشرية)
+  // بيانات لا كود — الأدمن يغيّرها من اللوحة بلا نشر جديد
+  allowedCustomerType CustomerType? @map("allowed_customer_type")
+
   users     User[]
   positions Position[]
 

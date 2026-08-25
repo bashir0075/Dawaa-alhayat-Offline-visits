@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException 
 import { CustomerType, CustomerStatus, CustomerSource, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService } from '../../common/services/scope.service';
+import { CustomerScopeService } from '../../common/services/customer-scope.service';
 import type { AuthUser } from '../../common/decorators/current-user.decorator';
 
 export interface CustomerInput {
@@ -30,6 +31,7 @@ export class CustomersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scope: ScopeService,
+    private readonly customerScope: CustomerScopeService,
   ) {}
 
   // ────────────────────────────────────────────────────────────────
@@ -70,6 +72,11 @@ export class CustomersService {
     const q = PrismaService.normalize(opts.q);
     if (q.length < 2) return [];
 
+    // قسم المستخدم يحدّ النتائج: مندوب Sales لا يرى طبيباً إطلاقاً
+    const allowedTypes = await this.customerScope.allowedTypes(user);
+    if (opts.customerType && !allowedTypes.includes(opts.customerType)) return [];
+    const typeFilter = opts.customerType ? [opts.customerType] : allowedTypes;
+
     const limit = Math.min(opts.limit ?? 20, 50);
     const scopeIds = await this.scope.visibleUserIds(user, 'customers');
     const mineOnly = opts.onlyMine ?? true;
@@ -95,7 +102,7 @@ export class CustomersService {
       WHERE c.deleted_at IS NULL
         AND c.status IN ('approved', 'pending')
         AND (c.normalized_name % ${q} OR c.normalized_name ILIKE ${'%' + q + '%'})
-        ${opts.customerType ? Prisma.sql`AND c.customer_type = ${opts.customerType}::"CustomerType"` : Prisma.empty}
+        AND c.customer_type IN (${Prisma.join(typeFilter.map((t) => Prisma.sql`${t}::"CustomerType"`))})
         ${userIds === null ? Prisma.empty : Prisma.sql`
           AND EXISTS (
             SELECT 1 FROM customer_assignments ca2
@@ -120,6 +127,8 @@ export class CustomersService {
    * الإسناد قبل الموافقة مقصود: المندوب يسجّل زيارته اليوم ولا ينتظر مديره.
    */
   async create(user: AuthUser, input: CustomerInput, source: CustomerSource = CustomerSource.added_in_app) {
+    await this.customerScope.assertAllowed(user, input.customerType);
+
     const nameAr = input.nameAr?.trim();
     if (!nameAr || nameAr.length < 2) {
       throw new BadRequestException('اسم العميل مطلوب');

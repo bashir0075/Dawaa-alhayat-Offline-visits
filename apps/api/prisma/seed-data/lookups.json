@@ -101,10 +101,11 @@
     { "nameAr": "الكل",                        "nameEn": "All" }
   ],
 
+  "_departmentsNote": "allowedCustomerType: pharmacy=صيدليات فقط · doctor=أطباء فقط · null=الاثنان",
   "departments": [
-    { "nameAr": "المبيعات", "nameEn": "Sales" },
-    { "nameAr": "الدعاية",  "nameEn": "Promotion" },
-    { "nameAr": "التسويق",  "nameEn": "Marketing" },
-    { "nameAr": "الموارد البشرية", "nameEn": "HR" }
+    { "nameAr": "المبيعات", "nameEn": "Sales",     "allowedCustomerType": "pharmacy" },
+    { "nameAr": "الدعاية",  "nameEn": "Promotion", "allowedCustomerType": "doctor" },
+    { "nameAr": "التسويق",  "nameEn": "Marketing", "allowedCustomerType": null },
+    { "nameAr": "الموارد البشرية", "nameEn": "HR",  "allowedCustomerType": null }
   ]
 }

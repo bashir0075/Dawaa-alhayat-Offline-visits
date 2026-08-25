@@ -1,5 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CustomerScopeService } from '../../common/services/customer-scope.service';
+import type { AuthUser } from '../../common/decorators/current-user.decorator';
 
 /**
  * القوائم المرجعية: قراءة للجميع، تعديل للأدمن.
@@ -7,11 +9,15 @@ import { PrismaService } from '../prisma/prisma.service';
  */
 @Injectable()
 export class CatalogService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly customerScope: CustomerScopeService,
+  ) {}
 
   /** كل ما تحتاجه شاشة تسجيل الزيارة في طلب واحد */
-  async bootstrap() {
-    const [products, provinces, specialities, classes, promoSuggestions] = await Promise.all([
+  async bootstrap(user: AuthUser) {
+    const [allowedCustomerTypes, products, provinces, specialities, classes, promoSuggestions] = await Promise.all([
+      this.customerScope.allowedTypes(user),
       this.prisma.product.findMany({
         where: { isActive: true, deletedAt: null },
         select: { id: true, code: true, shortName: true, nameAr: true, categoryId: true },
@@ -30,6 +36,8 @@ export class CatalogService {
     ]);
 
     return {
+      // Sales صيدليات · Promotion أطباء — تخفي الواجهة ما لا يخصّ المستخدم
+      allowedCustomerTypes,
       products,
       provinces,
       specialities,

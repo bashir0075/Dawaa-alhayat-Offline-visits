@@ -16,12 +16,18 @@ interface Province { id: number; nameAr: string; areas: { id: number; nameAr: st
 interface Speciality { id: number; nameEn: string; nameAr: string | null }
 interface ClassRow { id: number; code: string; monthlyTarget: number }
 interface Bootstrap {
+  allowedCustomerTypes: ('doctor' | 'pharmacy')[];
   products: Product[]; provinces: Province[]; specialities: Speciality[];
   classes: ClassRow[]; promoSuggestions: string[]; classesReady: boolean;
 }
 interface Warning { code: string; severity: 'info' | 'warning'; message: string }
 
 type Step = 'who' | 'what' | 'review';
+
+const TYPES = [
+  ['doctor', 'طبيب', Stethoscope],
+  ['pharmacy', 'صيدلية / زبون', Building2],
+] as const;
 
 export default function NewVisitPage() {
   const router = useRouter();
@@ -54,11 +60,17 @@ export default function NewVisitPage() {
 
   useEffect(() => {
     api.get<Bootstrap>('/catalog/bootstrap')
-      .then(setBoot)
+      .then((b) => {
+        setBoot(b);
+        // قسم المستخدم يحدّد النوع: Sales صيدليات · Promotion أطباء.
+        // إن كان مسموحاً له نوع واحد نثبّته ولا نعرض الاختيار أصلاً.
+        if (b.allowedCustomerTypes?.length === 1) setCustomerType(b.allowedCustomerTypes[0]);
+      })
       .catch((e) => toast('err', e.message));
   }, [toast]);
 
   const isOutList = !!newName;
+  const allowed = boot?.allowedCustomerTypes ?? ['doctor', 'pharmacy'];
   const areas = useMemo(
     () => boot?.provinces.find((p) => String(p.id) === nc.provinceId)?.areas ?? [],
     [boot, nc.provinceId],
@@ -139,30 +151,45 @@ export default function NewVisitPage() {
       {/* ═══ من ═══ */}
       {step === 'who' && (
         <div className="space-y-5 animate-fade-up">
-          <section className="card p-5">
-            <h2 className="font-semibold mb-4">نوع العميل</h2>
-            <div className="grid grid-cols-2 gap-3">
-              {([
-                ['doctor', 'طبيب', Stethoscope],
-                ['pharmacy', 'صيدلية / زبون', Building2],
-              ] as const).map(([v, label, Icon]) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => { setCustomerType(v); setCustomer(null); setNewName(null); }}
-                  className={cn(
-                    'flex flex-col items-center gap-2 rounded-field border-2 p-4 transition-all',
-                    customerType === v
-                      ? 'border-brand bg-brand-soft text-brand'
-                      : 'border-line text-muted hover:border-faint',
-                  )}
-                >
-                  <Icon className="size-6" />
-                  <span className="text-sm font-medium">{label}</span>
-                </button>
-              ))}
+          {allowed.length > 1 ? (
+            <section className="card p-5">
+              <h2 className="font-semibold mb-4">نوع العميل</h2>
+              <div className="grid grid-cols-2 gap-3">
+                {TYPES.filter(([v]) => allowed.includes(v)).map(([v, label, Icon]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => { setCustomerType(v); setCustomer(null); setNewName(null); }}
+                    className={cn(
+                      'flex flex-col items-center gap-2 rounded-field border-2 p-4 transition-all',
+                      customerType === v
+                        ? 'border-brand bg-brand-soft text-brand'
+                        : 'border-line text-muted hover:border-faint',
+                    )}
+                  >
+                    <Icon className="size-6" />
+                    <span className="text-sm font-medium">{label}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : (
+            <div className="flex items-center gap-3 rounded-card border border-line bg-elevated px-4 py-3">
+              {(() => {
+                const t = TYPES.find(([v]) => v === customerType)!;
+                const Icon = t[2];
+                return (
+                  <>
+                    <Icon className="size-5 shrink-0 text-brand" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{t[1]}</p>
+                      <p className="text-xs text-faint">حسب قسمك — لا يمكن تغييره</p>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
-          </section>
+          )}
 
           <section className="card p-5">
             <h2 className="font-semibold mb-1">العميل</h2>

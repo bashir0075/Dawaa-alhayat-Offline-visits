@@ -4,6 +4,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService } from '../../common/services/scope.service';
+import { CustomerScopeService } from '../../common/services/customer-scope.service';
 import { CustomersService, type CustomerInput } from '../customers/customers.service';
 import { SettingsService } from '../settings/settings.service';
 import type { AuthUser } from '../../common/decorators/current-user.decorator';
@@ -42,6 +43,7 @@ export class VisitsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scope: ScopeService,
+    private readonly customerScope: CustomerScopeService,
     private readonly customers: CustomersService,
     private readonly settings: SettingsService,
   ) {}
@@ -125,6 +127,8 @@ export class VisitsService {
    * فرصته الوحيدة لاكتشاف الخطأ.
    */
   async previewWarnings(user: AuthUser, input: CreateVisitInput): Promise<VisitWarning[]> {
+    await this.customerScope.assertAllowed(user, input.customerType);
+
     const warnings: VisitWarning[] = [];
     const visitDate = this.parseVisitDate(input.visitDate);
 
@@ -207,6 +211,10 @@ export class VisitsService {
   }
 
   async create(user: AuthUser, input: CreateVisitInput) {
+    // Sales صيدليات فقط · Promotion أطباء فقط — يُفحص على الخادم
+    // لا في الواجهة وحدها، وإلا كفى تعديل الطلب لتجاوز القاعدة.
+    await this.customerScope.assertAllowed(user, input.customerType);
+
     const visitDate = this.parseVisitDate(input.visitDate);
     await this.validateDate(visitDate);
     await this.validateProducts(input.products);

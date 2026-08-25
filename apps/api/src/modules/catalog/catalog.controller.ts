@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CatalogService } from './catalog.service';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentUser, type AuthUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('القوائم المرجعية')
 @Controller('catalog')
@@ -11,8 +11,8 @@ export class CatalogController {
 
   @Get('bootstrap')
   @ApiOperation({ summary: 'كل قوائم شاشة الزيارة في طلب واحد' })
-  bootstrap() {
-    return this.catalog.bootstrap();
+  bootstrap(@CurrentUser() user: AuthUser) {
+    return this.catalog.bootstrap(user);
   }
 
   @Get('products')
