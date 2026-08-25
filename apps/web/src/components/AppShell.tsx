@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, PlusCircle, ClipboardList, Users, BarChart3,
-  Settings, LogOut, Menu, X, Moon, Sun, ChevronLeft, Bell,
+  Settings, LogOut, Menu, X, Moon, Sun, CheckCircle2,
 } from 'lucide-react';
 import { useAuth, useUi } from '@/lib/store';
 import { cn, initials } from '@/lib/utils';
@@ -25,6 +25,7 @@ const NAV: NavItem[] = [
   { href: '/visits',    label: 'الزيارات',   icon: ClipboardList, permission: 'visits.view_own', primary: true },
   { href: '/customers', label: 'قائمتي',     icon: Users, permission: 'customers.view_own', primary: true },
   { href: '/reports',   label: 'التقارير',   icon: BarChart3, permission: 'reports.view_own', primary: true },
+  { href: '/approvals', label: 'الموافقات',  icon: CheckCircle2, permission: 'customers.approve' },
   { href: '/admin',     label: 'الإدارة',    icon: Settings, permission: 'users.view' },
 ];
 
