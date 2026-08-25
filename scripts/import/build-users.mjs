@@ -1,8 +1,8 @@
 /**
  * بناء قائمة المستخدمين من AuthUsers.xlsx
  * ────────────────────────────────────────────────────────────────
- * - يولّد اسم مستخدم = <UserID>@dawaa-alhayat
- * - كلمة المرور الأولى = UserID  (كما طلب العميل: نفس ما يحفظه المندوب)
+ * - اسم المستخدم = <الاسم>@dawaa-alhayat   مثال: bashir.salih@dawaa-alhayat
+ * - كلمة المرور   = UserID                 مثال: 6905306500
  * - يحلّ الأخطاء الإملائية في Direct_Manager إلى manager_id حقيقي
  * - يولّد UserID جديداً لأي تكرار
  * - ينشئ حسابات معطّلة للمدراء غير الموجودين في الملف
@@ -50,6 +50,26 @@ function normId(v) {
   return s.endsWith('.0') ? s.slice(0, -2) : s;
 }
 
+/**
+ * رقم ثابت مشتق من الاسم للحسابات المولّدة.
+ * لا عشوائية: تشغيل السكربت مرتين يجب أن ينتج الرقم نفسه، وإلا
+ * ظنّ الزرع أنه حساب جديد فتراكمت نسخ لكل تشغيل.
+ */
+function stableUserId(seed, taken) {
+  let h = 2166136261;
+  for (const ch of String(seed)) {
+    h ^= ch.charCodeAt(0);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  let id = String(1_000_000_000 + (h % 8_999_999_999));
+  let bump = 0;
+  while (taken.has(id)) {
+    id = String(1_000_000_000 + ((h + ++bump * 7919) % 8_999_999_999));
+  }
+  taken.add(id);
+  return id;
+}
+
 /** توليد UserID جديد من 10 خانات لا يصطدم بالموجود */
 function generateUserId(taken) {
   let id;
@@ -58,6 +78,29 @@ function generateUserId(taken) {
   } while (taken.has(id));
   taken.add(id);
   return id;
+}
+
+/**
+ * اسم المستخدم من الاسم الكامل: "Bashir Salih" → "bashir.salih"
+ * NFD + إزالة العلامات يعالج الحروف المشكولة، والتصادم يُحلّ برقم لاحق.
+ */
+function makeUsername(fullName, taken) {
+  const base =
+    String(fullName ?? '')
+      .normalize('NFD')
+      .replace(/\p{M}+/gu, '')
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .join('.') || 'user';
+
+  let name = base;
+  let n = 2;
+  while (taken.has(name)) name = `${base}${n++}`;
+  taken.add(name);
+  return name;
 }
 
 /** استنتاج الدور من المنصب */
@@ -116,6 +159,7 @@ console.log(`\n📖 قُرئ ${raw.length} صفاً من ${SRC}\n`);
 
 // ── المرحلة ١: توليد أسماء المستخدمين وحل التكرار ────────────────
 const takenIds = new Set();
+const takenNames = new Set();
 const notes = [];
 const users = [];
 
@@ -126,12 +170,11 @@ for (const r of raw) {
 
   if (!userId) {
     userId = generateUserId(takenIds);
-    note = 'UserID مفقود — وُلّد جديد';
+    note = 'UserID مفقود — وُلّد جديد ليصلح كلمة مرور';
   } else if (takenIds.has(userId)) {
-    const old = userId;
-    userId = generateUserId(takenIds);
-    note = `UserID ${old} مكرر — وُلّد جديد`;
-    notes.push({ type: 'duplicate', name, detail: `${old} → ${userId}` });
+    // كلمة المرور ليست مفتاحاً فريداً — تكرار UserID بين شخصين مقبول
+    // تقنياً. نسجّله للعلم فقط، ولا نغيّر ما يحفظه المستخدم.
+    notes.push({ type: 'shared_password', name, detail: `يشترك في كلمة المرور ${userId}` });
   } else {
     takenIds.add(userId);
   }
@@ -140,10 +183,12 @@ for (const r of raw) {
     notes.push({ type: 'weak_password', name, detail: `كلمة مرور ضعيفة: ${userId}` });
   }
 
+  const username = makeUsername(name, takenNames);
+
   users.push({
     name,
     legacyUserId: userId,
-    username: userId + SUFFIX,
+    username: username + SUFFIX,
     password: userId,
     department: clean(r.Department) || null,
     position: canonicalPosition(r.Position),
@@ -160,11 +205,11 @@ const byName = new Map(users.map((u) => [u.name, u]));
 
 for (const ph of PLACEHOLDER_MANAGERS) {
   if (byName.has(ph.name)) continue;
-  const userId = generateUserId(takenIds);
+  const userId = stableUserId(ph.name, takenIds);
   const u = {
     name: ph.name,
     legacyUserId: userId,
-    username: userId + SUFFIX,
+    username: makeUsername(ph.name, takenNames) + SUFFIX,
     password: userId,
     department: ph.department,
     position: ph.position,
@@ -255,7 +300,7 @@ console.log(line);
 const byType = notes.reduce((a, n) => ((a[n.type] ??= []).push(n), a), {});
 for (const [type, list] of Object.entries(byType)) {
   const label = {
-    duplicate: '🔴 UserID مكرر',
+    shared_password: '🟡 كلمة مرور مشتركة',
     weak_password: '🟠 كلمة مرور ضعيفة',
     placeholder: '⚙️  حساب معطّل أُنشئ',
     manager_fixed: '✅ اسم مدير صُحّح',
@@ -299,7 +344,7 @@ const ws = out.addWorksheet('الحسابات', { views: [{ state: 'frozen', ySp
 ws.columns = [
   { header: '#',              key: 'i',    width: 5 },
   { header: 'الاسم',           key: 'name', width: 26 },
-  { header: 'اسم المستخدم',    key: 'user', width: 30 },
+  { header: 'اسم المستخدم',    key: 'user', width: 34 },
   { header: 'كلمة المرور',     key: 'pass', width: 16 },
   { header: 'القسم',           key: 'dep',  width: 14 },
   { header: 'المنصب',          key: 'pos',  width: 26 },
@@ -347,7 +392,7 @@ ws.eachRow((row, n) => {
     row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
     row.font = { bold: true };
   }
-  if (u.note?.includes('مكرر') || /^\d{1,7}$/.test(u.password)) {
+  if (/^\d{1,7}$/.test(u.password) || !/^\d+$/.test(u.password)) {
     row.getCell('pass').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFECACA' } };
   }
 });

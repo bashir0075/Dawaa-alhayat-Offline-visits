@@ -283,10 +283,23 @@ async function seedUsers() {
   }
   console.log(`   ✓ ${positions.size} منصباً`);
 
-  // تمريرة ١: إنشاء الحسابات بلا مدير
-  let created = 0, updated = 0;
+  // legacyUserId ليس مفتاحاً فريداً — شخصان في الملف الأصلي يتشاركان
+  // الرقم نفسه. المطابقة عليه بلا هذا الحارس تجعل الثاني يدهس الأول.
+  const idCount = new Map();
   for (const u of list) {
-    const existing = await prisma.user.findUnique({ where: { username: u.username } });
+    if (u.legacyUserId) idCount.set(u.legacyUserId, (idCount.get(u.legacyUserId) ?? 0) + 1);
+  }
+
+  // تمريرة ١: إنشاء الحسابات بلا مدير
+  let created = 0, updated = 0, renamed = 0;
+  for (const u of list) {
+    // username هو الهوية. legacyUserId احتياطي لمرة واحدة فقط: يلتقط
+    // الحسابات المنشأة بالصيغة القديمة فيعيد تسميتها بدل تكرارها.
+    const existing =
+      (await prisma.user.findUnique({ where: { username: u.username } })) ??
+      (u.legacyUserId && idCount.get(u.legacyUserId) === 1
+        ? await prisma.user.findFirst({ where: { legacyUserId: u.legacyUserId } })
+        : null);
     const data = {
       username: u.username,
       legacyUserId: u.legacyUserId,
@@ -298,17 +311,18 @@ async function seedUsers() {
       isActive: u.isActive,
     };
     if (existing) {
+      if (existing.username !== u.username) renamed++;
       await prisma.user.update({ where: { id: existing.id }, data });
       updated++;
     } else {
-      // كلمة المرور الأولى = UserID  (قرار العميل: نفس ما يحفظه المندوب)
+      // اسم المستخدم من الاسم · كلمة المرور = UserID (قرار العميل)
       await prisma.user.create({
         data: { ...data, passwordHash: await bcrypt.hash(u.initialPassword, ROUNDS) },
       });
       created++;
     }
   }
-  console.log(`   ✓ ${created} حساباً جديداً · ${updated} محدّثاً`);
+  console.log(`   ✓ ${created} حساباً جديداً · ${updated} محدّثاً${renamed ? ` · ${renamed} أُعيدت تسميته` : ''}`);
 
   // تمريرة ٢: ربط الهرم الإداري
   const dbUsers = await prisma.user.findMany({ select: { id: true, fullNameEn: true } });

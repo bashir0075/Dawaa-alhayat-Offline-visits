@@ -28,9 +28,9 @@ async function api(method, path, { token, body } = {}) {
   return { status: res.status, body: json };
 }
 
-async function login(id) {
-  const r = await api('POST', '/auth/login', { body: { username: id, password: id } });
-  if (r.status !== 200) throw new Error(`فشل دخول ${id}: ${JSON.stringify(r.body)}`);
+async function login(username, password) {
+  const r = await api('POST', '/auth/login', { body: { username, password } });
+  if (r.status !== 200) throw new Error(`فشل دخول ${username}: ${JSON.stringify(r.body)}`);
   return r.body.accessToken;
 }
 
@@ -43,7 +43,7 @@ const today = new Date().toISOString().slice(0, 10);
 
   // ══ Promotion — أطباء فقط ═════════════════════════════════════
   console.log('\n── مندوب Promotion (Baqer Maki) ──');
-  const promo = await login('6470983589');
+  const promo = await login('baqer.maki', '6470983589');
 
   let r = await api('GET', '/catalog/bootstrap', { token: promo });
   check('bootstrap يعيد doctor فقط',
@@ -97,7 +97,7 @@ const today = new Date().toISOString().slice(0, 10);
 
   // ══ Sales — صيدليات فقط ═══════════════════════════════════════
   console.log('\n── مندوب Sales (Hawser Salih) ──');
-  const sales = await login('5694668490');
+  const sales = await login('hawser.salih', '5694668490');
 
   r = await api('GET', '/catalog/bootstrap', { token: sales });
   check('bootstrap يعيد pharmacy فقط',
@@ -139,7 +139,7 @@ const today = new Date().toISOString().slice(0, 10);
 
   // ══ super_admin — النوعان ═════════════════════════════════════
   console.log('\n── Super Admin (Bashir Salih — قسمه Sales) ──');
-  const admin = await login('6905306500');
+  const admin = await login('bashir.salih', '6905306500');
 
   r = await api('GET', '/catalog/bootstrap', { token: admin });
   check('يرى النوعين رغم أن قسمه Sales',

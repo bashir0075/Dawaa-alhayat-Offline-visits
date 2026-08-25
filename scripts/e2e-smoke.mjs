@@ -39,8 +39,8 @@ const section = (t) => console.log(`\n${'─'.repeat(60)}\n${t}\n${'─'.repeat(
   check('رفض بيانات خاطئة', r.status === 401, `HTTP ${r.status}`);
 
   // الرقم وحده — بلا لاحقة
-  r = await api('POST', '/auth/login', { body: { username: '6905306500', password: '6905306500' } });
-  check('دخول بالرقم بلا لاحقة', r.status === 200, `HTTP ${r.status} ${JSON.stringify(r.body).slice(0, 120)}`);
+  r = await api('POST', '/auth/login', { body: { username: 'bashir.salih', password: '6905306500' } });
+  check('دخول بالاسم بلا لاحقة', r.status === 200, `HTTP ${r.status} ${JSON.stringify(r.body).slice(0, 120)}`);
   const admin = r.body;
   if (!admin?.accessToken) { console.log('\n🛑 فشل الدخول — توقف'); process.exit(1); }
 
@@ -48,7 +48,7 @@ const section = (t) => console.log(`\n${'─'.repeat(60)}\n${t}\n${'─'.repeat(
   check('يملك 37 إذناً', admin.user.permissions.length === 37, `${admin.user.permissions.length}`);
 
   // مع اللاحقة
-  r = await api('POST', '/auth/login', { body: { username: '6905306500@dawaa-alhayat', password: '6905306500' } });
+  r = await api('POST', '/auth/login', { body: { username: 'bashir.salih@dawaa-alhayat', password: '6905306500' } });
   check('دخول باللاحقة الكاملة', r.status === 200, `HTTP ${r.status}`);
 
   r = await api('GET', '/auth/me', { token: admin.accessToken });

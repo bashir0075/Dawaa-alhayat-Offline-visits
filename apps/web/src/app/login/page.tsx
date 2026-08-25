@@ -80,24 +80,25 @@ export default function LoginPage() {
           </div>
 
           <h2 className="text-2xl font-bold">تسجيل الدخول</h2>
-          <p className="mt-1.5 text-sm text-muted">أدخل رقم المستخدم وكلمة المرور</p>
+          <p className="mt-1.5 text-sm text-muted">أدخل اسم المستخدم وكلمة المرور</p>
 
           <form onSubmit={submit} className="mt-7 space-y-4">
             <div>
               <label htmlFor="u" className="label">اسم المستخدم</label>
               <input
                 id="u"
-                className="field num text-start"
+                className="field text-start"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="6905306500"
+                placeholder="bashir.salih"
                 autoComplete="username"
-                inputMode="text"
+                inputMode="email"
+                dir="ltr"
                 autoFocus
                 required
               />
               <p className="mt-1.5 text-xs text-faint">
-                الرقم وحده يكفي — تُضاف <span className="num">@dawaa-alhayat</span> تلقائياً
+                الاسم وحده يكفي — تُضاف <span className="num">@dawaa-alhayat</span> تلقائياً
               </p>
             </div>
 
@@ -110,7 +111,9 @@ export default function LoginPage() {
                   className="field num text-start pe-11"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  placeholder="رقم المستخدم"
                   autoComplete="current-password"
+                  dir="ltr"
                   required
                 />
                 <button
